@@ -1597,7 +1597,7 @@
     },
     {
       "id": "last-drop-bourbon",
-      "name": "Last Drop Distillers Bourbon",
+      "name": "Last Drop Bourbon",
       "distillery": "Last Drop Distillers",
       "type": "bourbon",
       "proof": null,
@@ -1606,7 +1606,7 @@
       "rarity_tier": 1,
       "average_rating": 9.5,
       "rating_sources": ["Breaking Bourbon"],
-      "search_terms": ["Last Drop Bourbon", "Last Drop Distillers"],
+      "search_terms": ["Last Drop Bourbon"],
       "notes": "Ultra-premium. Highest rated by Breaking Bourbon. Extremely rare.",
       "annual_release": false,
       "release_window": null

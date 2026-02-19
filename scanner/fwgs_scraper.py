@@ -2,12 +2,8 @@ import time
 import logging
 import requests
 from config import Config
-from scanner.product_parser import (
-    parse_fwgs_search_results,
-    parse_fwgs_inventory_page,
-    parse_legacy_search_results,
-)
-from scanner.store_locator import get_session
+from scanner.product_parser import parse_fwgs_search_results
+from scanner.store_locator import get_session, check_store_stock, fetch_all_stores
 from knowledge.bourbon_db import get_search_terms_by_tier, match_product_to_bourbon
 from database.models import (
     upsert_fwgs_product,
@@ -28,66 +24,18 @@ class FWGSScanner:
         self.new_finds = []
 
     def run_full_scan(self):
-        """Run a complete scan: search for all tracked bourbons, check inventory."""
+        """Run a complete scan: search for all tracked bourbons."""
         scan_id = log_scan_start("full_scan")
         total_found = 0
         new_finds_count = 0
 
         try:
+            # Pre-load store locations for per-store inventory lookups
+            fetch_all_stores(self.session)
             search_terms = get_search_terms_by_tier(max_tier=4)
-            seen_terms = set()
-
-            for entry in search_terms:
-                term = entry["term"]
-                if term.lower() in seen_terms:
-                    continue
-                seen_terms.add(term.lower())
-
-                logger.info(f"Searching FWGS for: {term}")
-                products = self._search_fwgs(term)
-                logger.info(f"  Found {len(products)} products for '{term}'")
-
-                for product in products:
-                    # Match to our knowledge base
-                    matched = match_product_to_bourbon(product["name"])
-                    if matched:
-                        product["bourbon_id"] = matched["id"]
-
-                    product_id = upsert_fwgs_product(product)
-                    if product_id:
-                        total_found += 1
-
-                        # Check inventory at stores
-                        if product.get("fwgs_code"):
-                            inventory = self._check_inventory(product["fwgs_code"])
-                            for store in inventory:
-                                if store.get("quantity", 0) > 0:
-                                    is_new = check_is_new_find(
-                                        product["fwgs_code"],
-                                        store.get("store_number", ""),
-                                    )
-                                    add_inventory_snapshot(
-                                        product_id,
-                                        store.get("store_number", ""),
-                                        store.get("store_name", ""),
-                                        store.get("store_address", ""),
-                                        store.get("quantity", 0),
-                                    )
-                                    if is_new and matched:
-                                        new_finds_count += 1
-                                        self.new_finds.append({
-                                            "bourbon": matched,
-                                            "product": product,
-                                            "store": store,
-                                        })
-
-                time.sleep(self.delay)
-
+            total_found, new_finds_count = self._scan_terms(search_terms)
             log_scan_complete(scan_id, total_found, new_finds_count)
-            logger.info(
-                f"Scan complete: {total_found} products, {new_finds_count} new finds"
-            )
-
+            logger.info(f"Scan complete: {total_found} products, {new_finds_count} new finds")
         except Exception as e:
             logger.error(f"Scan error: {e}")
             log_scan_error(scan_id, str(e))
@@ -102,53 +50,15 @@ class FWGSScanner:
 
     def run_quick_scan(self, tier=None):
         """Quick scan for specific tier(s) only."""
-        max_tier = tier or 2  # Default: just unicorns and highly allocated
+        max_tier = tier or 2
         scan_id = log_scan_start(f"quick_scan_tier_{max_tier}")
         total_found = 0
         new_finds_count = 0
 
         try:
+            fetch_all_stores(self.session)
             search_terms = get_search_terms_by_tier(max_tier=max_tier)
-            seen_terms = set()
-
-            for entry in search_terms:
-                term = entry["term"]
-                if term.lower() in seen_terms:
-                    continue
-                seen_terms.add(term.lower())
-
-                products = self._search_fwgs(term)
-                for product in products:
-                    matched = match_product_to_bourbon(product["name"])
-                    if matched:
-                        product["bourbon_id"] = matched["id"]
-                        product_id = upsert_fwgs_product(product)
-                        if product_id:
-                            total_found += 1
-                            if product.get("fwgs_code"):
-                                inventory = self._check_inventory(product["fwgs_code"])
-                                for store in inventory:
-                                    if store.get("quantity", 0) > 0:
-                                        is_new = check_is_new_find(
-                                            product["fwgs_code"],
-                                            store.get("store_number", ""),
-                                        )
-                                        add_inventory_snapshot(
-                                            product_id,
-                                            store.get("store_number", ""),
-                                            store.get("store_name", ""),
-                                            store.get("store_address", ""),
-                                            store.get("quantity", 0),
-                                        )
-                                        if is_new:
-                                            new_finds_count += 1
-                                            self.new_finds.append({
-                                                "bourbon": matched,
-                                                "product": product,
-                                                "store": store,
-                                            })
-                time.sleep(self.delay)
-
+            total_found, new_finds_count = self._scan_terms(search_terms)
             log_scan_complete(scan_id, total_found, new_finds_count)
         except Exception as e:
             log_scan_error(scan_id, str(e))
@@ -161,48 +71,148 @@ class FWGSScanner:
             "new_finds_detail": self.new_finds,
         }
 
+    def _scan_terms(self, search_terms):
+        """Core scan loop shared by full and quick scan."""
+        total_found = 0
+        new_finds_count = 0
+        seen_terms = set()
+        seen_codes = set()
+        # Collect matched products for per-store stock check
+        stock_check_queue = []
+
+        for entry in search_terms:
+            term = entry["term"]
+            if term.lower() in seen_terms:
+                continue
+            seen_terms.add(term.lower())
+
+            logger.info(f"Searching FWGS for: {term}")
+            products = self._search_fwgs(term)
+
+            for product in products:
+                code = product.get("fwgs_code", "")
+                if code in seen_codes:
+                    continue
+                seen_codes.add(code)
+
+                # Skip products that are clearly not bourbon/whiskey
+                category = (product.get("category") or "").lower()
+                if category and category not in (
+                    "", "bourbon", "whiskey", "rye whiskey",
+                    "american whiskey", "spirits",
+                ):
+                    continue
+
+                # Match to knowledge base
+                matched = match_product_to_bourbon(product["name"])
+                if matched:
+                    product["bourbon_id"] = matched["id"]
+
+                product_id = upsert_fwgs_product(product)
+                if product_id:
+                    total_found += 1
+
+                    # Queue matched in-stock products for per-store check
+                    if matched and product.get("in_stock"):
+                        stock_check_queue.append({
+                            "product_id": product_id,
+                            "product": product,
+                            "matched": matched,
+                            "code": code,
+                        })
+
+            time.sleep(self.delay)
+
+        # Phase 2: Per-store inventory lookups for matched products
+        if stock_check_queue:
+            logger.info(
+                f"Checking per-store stock for {len(stock_check_queue)} "
+                f"matched products..."
+            )
+            new_finds_count = self._check_per_store_stock(stock_check_queue)
+
+        return total_found, new_finds_count
+
+    def _check_per_store_stock(self, queue):
+        """Query per-store stock for matched products via OCC stockStatus API."""
+        new_finds_count = 0
+
+        for item in queue:
+            product = item["product"]
+            matched = item["matched"]
+            code = item["code"]
+            product_id = item["product_id"]
+
+            logger.info(
+                f"  Checking stores for: {product['name'][:50]} "
+                f"(tier {matched['rarity_tier']})"
+            )
+
+            stores_with_stock = check_store_stock(
+                self.session, code
+            )
+
+            if stores_with_stock:
+                logger.info(
+                    f"    Found at {len(stores_with_stock)} store(s)"
+                )
+                for store in stores_with_stock:
+                    is_new = check_is_new_find(
+                        code, store["store_number"]
+                    )
+                    add_inventory_snapshot(
+                        product_id,
+                        store["store_number"],
+                        store["store_name"],
+                        store["store_address"],
+                        store["quantity"],
+                    )
+                    if is_new:
+                        new_finds_count += 1
+                        self.new_finds.append({
+                            "bourbon": matched,
+                            "product": product,
+                            "store": store,
+                        })
+                        logger.info(
+                            f"    NEW FIND: {store['store_name']} "
+                            f"qty={store['quantity']}"
+                        )
+            else:
+                # Online-only stock (no physical stores)
+                is_new = check_is_new_find(code, "online")
+                add_inventory_snapshot(
+                    product_id, "online", "FWGS Online",
+                    product.get("url", ""), 1,
+                )
+                if is_new:
+                    new_finds_count += 1
+                    self.new_finds.append({
+                        "bourbon": matched,
+                        "product": product,
+                        "store": {
+                            "store_name": "FWGS Online",
+                            "store_number": "online",
+                            "store_address": product.get("url", ""),
+                            "quantity": 1,
+                        },
+                    })
+
+            time.sleep(self.delay)
+
+        return new_finds_count
+
     def _search_fwgs(self, term):
         """Search the FWGS website for a product term."""
-        products = []
-
-        # Try modern FWGS site first
         try:
             url = Config.FWGS_SEARCH_URL
             params = {"Ntt": term}
             resp = self.session.get(url, params=params, timeout=15)
             if resp.status_code == 200:
-                products = parse_fwgs_search_results(resp.text)
+                return parse_fwgs_search_results(resp.text)
         except requests.RequestException as e:
             logger.warning(f"FWGS search failed for '{term}': {e}")
-
-        # Fallback to legacy PLCB search
-        if not products:
-            try:
-                url = Config.FWGS_LEGACY_SEARCH_URL
-                data = {"txtBrandName": term, "btnSearch": "Search"}
-                resp = self.session.post(url, data=data, timeout=15)
-                if resp.status_code == 200:
-                    products = parse_legacy_search_results(resp.text)
-            except requests.RequestException as e:
-                logger.warning(f"Legacy search failed for '{term}': {e}")
-
-        return products
-
-    def _check_inventory(self, product_code):
-        """Check store inventory for a specific product code."""
-        stores = []
-
-        try:
-            url = Config.FWGS_LEGACY_INVENTORY_URL
-            params = {"cdeNo": product_code}
-            resp = self.session.get(url, params=params, timeout=15)
-            if resp.status_code == 200:
-                stores = parse_fwgs_inventory_page(resp.text)
-            time.sleep(self.delay / 2)  # Shorter delay for inventory checks
-        except requests.RequestException as e:
-            logger.warning(f"Inventory check failed for code {product_code}: {e}")
-
-        return stores
+        return []
 
     def search_single_product(self, term):
         """Search for a single product (for manual searches)."""

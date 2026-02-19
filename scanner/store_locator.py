@@ -1,175 +1,148 @@
-import re
-import time
+import logging
 import requests
-from bs4 import BeautifulSoup
 from config import Config
+
+logger = logging.getLogger(__name__)
+
+# In-memory cache of store data (loaded once per app lifetime)
+_store_cache = {}
 
 
 def get_session():
     session = requests.Session()
     session.headers.update({
         "User-Agent": Config.USER_AGENT,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept": "application/json,text/html,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.5",
     })
     return session
 
 
 def fetch_all_stores(session=None):
-    """Fetch list of all PA FWGS store locations."""
+    """Fetch all 600 PA FWGS store locations from the OCC locations API."""
+    global _store_cache
+    if _store_cache:
+        return list(_store_cache.values())
+
     if session is None:
         session = get_session()
 
     stores = []
-    # PA has 67 counties — iterate through them
-    pa_counties = [
-        "Adams", "Allegheny", "Armstrong", "Beaver", "Bedford", "Berks",
-        "Blair", "Bradford", "Bucks", "Butler", "Cambria", "Cameron",
-        "Carbon", "Centre", "Chester", "Clarion", "Clearfield", "Clinton",
-        "Columbia", "Crawford", "Cumberland", "Dauphin", "Delaware", "Elk",
-        "Erie", "Fayette", "Forest", "Franklin", "Fulton", "Greene",
-        "Huntingdon", "Indiana", "Jefferson", "Juniata", "Lackawanna",
-        "Lancaster", "Lawrence", "Lebanon", "Lehigh", "Luzerne", "Lycoming",
-        "McKean", "Mercer", "Mifflin", "Monroe", "Montgomery", "Montour",
-        "Northampton", "Northumberland", "Perry", "Philadelphia", "Pike",
-        "Potter", "Schuylkill", "Snyder", "Somerset", "Sullivan", "Susquehanna",
-        "Tioga", "Union", "Venango", "Warren", "Washington", "Wayne",
-        "Westmoreland", "Wyoming", "York"
-    ]
-
-    for i, county in enumerate(pa_counties):
+    limit = 250
+    for offset in (0, 250, 500):
         try:
-            url = f"{Config.FWGS_STORE_URL}?county={i + 1}"
-            resp = session.get(url, timeout=15)
+            url = f"{Config.FWGS_BASE_URL}/ccstore/v1/locations"
+            resp = session.get(url, params={"limit": limit, "offset": offset},
+                               timeout=15)
             if resp.status_code == 200:
-                county_stores = _parse_store_list(resp.text, county)
-                stores.extend(county_stores)
-            time.sleep(Config.REQUEST_DELAY_SECONDS)
-        except requests.RequestException:
-            continue
+                data = resp.json()
+                for loc in data.get("items", []):
+                    store = {
+                        "store_number": loc.get("locationId", ""),
+                        "store_name": loc.get("name", ""),
+                        "address": loc.get("address1", ""),
+                        "city": loc.get("city", ""),
+                        "state": loc.get("stateAddress", "PA"),
+                        "zip": loc.get("postalCode", ""),
+                        "county": loc.get("county", ""),
+                        "phone": loc.get("phoneNumber", ""),
+                        "hours": loc.get("hours", ""),
+                        "latitude": loc.get("latitude"),
+                        "longitude": loc.get("longitude"),
+                        "pickup": loc.get("pickUp", False),
+                    }
+                    stores.append(store)
+        except requests.RequestException as e:
+            logger.warning(f"Failed to fetch stores (offset={offset}): {e}")
 
+    # Build cache keyed by store number
+    _store_cache = {s["store_number"]: s for s in stores}
+    logger.info(f"Loaded {len(stores)} FWGS store locations")
     return stores
 
 
-def _parse_store_list(html, county):
-    """Parse store listings from county page."""
-    soup = BeautifulSoup(html, "lxml")
-    stores = []
-
-    # Look for store entries in tables or divs
-    rows = soup.select("table tr, .store-row, [class*='store']")
-    for row in rows:
-        store = _parse_single_store(row, county)
-        if store:
-            stores.append(store)
-
-    # Fallback: parse text blocks
-    if not stores:
-        stores = _parse_store_text_blocks(soup, county)
-
-    return stores
+def get_store_info(store_number):
+    """Get cached info for a single store by number."""
+    if not _store_cache:
+        fetch_all_stores()
+    return _store_cache.get(store_number)
 
 
-def _parse_single_store(element, county):
-    """Parse a single store entry."""
-    store = {"county": county}
-
-    # Store number
-    text = element.get_text()
-    num_match = re.search(r"Store\s*#?\s*(\d{4})", text)
-    if num_match:
-        store["store_number"] = num_match.group(1)
-
-    # Store name / address from links or text
-    link = element.select_one("a")
-    if link:
-        store["store_name"] = link.get_text(strip=True)
-
-    # Address
-    addr_match = re.search(
-        r"(\d+\s+[\w\s]+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|"
-        r"Lane|Ln|Way|Pike|Highway|Hwy|Court|Ct|Place|Pl|Circle|Cir)[\w\s,]*)",
-        text, re.I
-    )
-    if addr_match:
-        store["address"] = addr_match.group(1).strip()
-
-    # Phone
-    phone_match = re.search(r"\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}", text)
-    if phone_match:
-        store["phone"] = phone_match.group()
-
-    # City/zip
-    zip_match = re.search(r"(\w[\w\s]+),?\s*PA\s*(\d{5})", text)
-    if zip_match:
-        store["city"] = zip_match.group(1).strip()
-        store["zip"] = zip_match.group(2)
-
-    if store.get("store_number") or store.get("store_name"):
-        return store
-    return None
+def get_all_store_ids():
+    """Get list of all store location IDs."""
+    if not _store_cache:
+        fetch_all_stores()
+    return list(_store_cache.keys())
 
 
-def _parse_store_text_blocks(soup, county):
-    """Parse stores from less structured text content."""
-    stores = []
-    # Try to find store blocks by looking for store number patterns
-    text = soup.get_text()
-    blocks = re.split(r"(?=Store\s*#?\s*\d{4})", text)
-    for block in blocks:
-        if not block.strip():
-            continue
-        store = {"county": county}
-        num_match = re.search(r"Store\s*#?\s*(\d{4})", block)
-        if num_match:
-            store["store_number"] = num_match.group(1)
-            # Get address lines after store number
-            lines = block.split("\n")
-            addr_parts = []
-            for line in lines[1:4]:
-                line = line.strip()
-                if line and not line.startswith("Store"):
-                    addr_parts.append(line)
-            if addr_parts:
-                store["address"] = ", ".join(addr_parts)
-                store["store_name"] = addr_parts[0]
-            stores.append(store)
-    return stores
+def check_store_stock(session, fwgs_code, store_ids=None):
+    """Check per-store stock for a product using the OCC stockStatus API.
+
+    Args:
+        session: requests.Session
+        fwgs_code: Product SKU (e.g., "000005480")
+        store_ids: List of store IDs to check. If None, checks all stores.
+
+    Returns:
+        List of dicts with store_number, store_name, store_address, quantity
+        for stores that have stock.
+    """
+    if not _store_cache:
+        fetch_all_stores(session)
+
+    if store_ids is None:
+        store_ids = list(_store_cache.keys())
+
+    in_stock_stores = []
+
+    # Query in batches of 100 store IDs to avoid URL length limits
+    batch_size = 100
+    for i in range(0, len(store_ids), batch_size):
+        batch = store_ids[i:i + batch_size]
+        try:
+            url = f"{Config.FWGS_BASE_URL}/ccstore/v1/stockStatus"
+            params = {
+                "products": fwgs_code,
+                "locationIds": ",".join(batch),
+                "actualStockStatus": "true",
+            }
+            resp = session.get(url, params=params, timeout=20)
+            if resp.status_code == 200:
+                data = resp.json()
+                for item in data.get("items", []):
+                    if item.get("stockStatus") == "IN_STOCK":
+                        loc_id = item.get("locationId", "")
+                        qty = item.get("productSkuInventoryStatus", {}).get(
+                            fwgs_code, 0
+                        )
+                        if qty > 0:
+                            store = _store_cache.get(loc_id, {})
+                            addr = store.get("address", "")
+                            if store.get("city"):
+                                addr = f"{addr}, {store['city']}"
+                            if store.get("zip"):
+                                addr = f"{addr} {store['zip']}"
+                            in_stock_stores.append({
+                                "store_number": loc_id,
+                                "store_name": store.get("store_name",
+                                                        f"Store #{loc_id}"),
+                                "store_address": addr,
+                                "quantity": qty,
+                                "county": store.get("county", ""),
+                            })
+        except requests.RequestException as e:
+            logger.warning(
+                f"stockStatus failed for {fwgs_code} batch {i}: {e}"
+            )
+
+    return in_stock_stores
 
 
-def get_stores_by_county(county_name, session=None):
+def get_stores_by_county(county_name):
     """Get stores for a specific county."""
-    if session is None:
-        session = get_session()
-
-    pa_counties = [
-        "Adams", "Allegheny", "Armstrong", "Beaver", "Bedford", "Berks",
-        "Blair", "Bradford", "Bucks", "Butler", "Cambria", "Cameron",
-        "Carbon", "Centre", "Chester", "Clarion", "Clearfield", "Clinton",
-        "Columbia", "Crawford", "Cumberland", "Dauphin", "Delaware", "Elk",
-        "Erie", "Fayette", "Forest", "Franklin", "Fulton", "Greene",
-        "Huntingdon", "Indiana", "Jefferson", "Juniata", "Lackawanna",
-        "Lancaster", "Lawrence", "Lebanon", "Lehigh", "Luzerne", "Lycoming",
-        "McKean", "Mercer", "Mifflin", "Monroe", "Montgomery", "Montour",
-        "Northampton", "Northumberland", "Perry", "Philadelphia", "Pike",
-        "Potter", "Schuylkill", "Snyder", "Somerset", "Sullivan", "Susquehanna",
-        "Tioga", "Union", "Venango", "Warren", "Washington", "Wayne",
-        "Westmoreland", "Wyoming", "York"
+    if not _store_cache:
+        fetch_all_stores()
+    return [
+        s for s in _store_cache.values()
+        if s.get("county", "").lower() == county_name.lower()
     ]
-
-    try:
-        idx = next(
-            i for i, c in enumerate(pa_counties)
-            if c.lower() == county_name.lower()
-        )
-    except StopIteration:
-        return []
-
-    url = f"{Config.FWGS_STORE_URL}?county={idx + 1}"
-    try:
-        resp = session.get(url, timeout=15)
-        if resp.status_code == 200:
-            return _parse_store_list(resp.text, county_name)
-    except requests.RequestException:
-        pass
-    return []
