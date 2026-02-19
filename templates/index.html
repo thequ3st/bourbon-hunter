@@ -42,7 +42,15 @@
     <!-- Scanner Status Banner -->
     <div id="scan-banner" class="scan-banner hidden">
         <div class="scan-banner__spinner"></div>
-        <span id="scan-banner-text">Scanning FWGS...</span>
+        <div class="scan-banner__content">
+            <span id="scan-banner-text">Scanning FWGS...</span>
+            <div id="scan-progress-wrap" class="scan-progress hidden">
+                <div class="scan-progress__bar">
+                    <div class="scan-progress__fill" id="scan-progress-fill"></div>
+                </div>
+                <span class="scan-progress__label" id="scan-progress-label"></span>
+            </div>
+        </div>
     </div>
 
     <!-- Filters -->

@@ -18,10 +18,11 @@ logger = logging.getLogger(__name__)
 
 
 class FWGSScanner:
-    def __init__(self):
+    def __init__(self, on_progress=None):
         self.session = get_session()
         self.delay = Config.REQUEST_DELAY_SECONDS
         self.new_finds = []
+        self._on_progress = on_progress or (lambda p: None)
 
     def run_full_scan(self):
         """Run a complete scan: search for all tracked bourbons."""
@@ -80,11 +81,24 @@ class FWGSScanner:
         # Collect matched products for per-store stock check
         stock_check_queue = []
 
+        # Deduplicate terms first so we know the true count
+        unique_terms = []
         for entry in search_terms:
+            t = entry["term"].lower()
+            if t not in seen_terms:
+                seen_terms.add(t)
+                unique_terms.append(entry)
+        total_terms = len(unique_terms)
+
+        for idx, entry in enumerate(unique_terms):
             term = entry["term"]
-            if term.lower() in seen_terms:
-                continue
-            seen_terms.add(term.lower())
+
+            self._on_progress({
+                "phase": "search",
+                "current": idx + 1,
+                "total": total_terms,
+                "detail": term,
+            })
 
             logger.info(f"Searching FWGS for: {term}")
             products = self._search_fwgs(term)
@@ -136,12 +150,20 @@ class FWGSScanner:
     def _check_per_store_stock(self, queue):
         """Query per-store stock for matched products via OCC stockStatus API."""
         new_finds_count = 0
+        total_items = len(queue)
 
-        for item in queue:
+        for idx, item in enumerate(queue):
             product = item["product"]
             matched = item["matched"]
             code = item["code"]
             product_id = item["product_id"]
+
+            self._on_progress({
+                "phase": "inventory",
+                "current": idx + 1,
+                "total": total_items,
+                "detail": product["name"][:50],
+            })
 
             logger.info(
                 f"  Checking stores for: {product['name'][:50]} "

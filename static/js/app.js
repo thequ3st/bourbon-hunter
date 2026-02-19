@@ -349,13 +349,34 @@
         }
     }
 
-    function showScanBanner(text) {
+    function showScanBanner(text, progress) {
         scanBannerText.textContent = text;
         scanBanner.classList.remove("hidden");
+
+        const wrap = document.getElementById("scan-progress-wrap");
+        const fill = document.getElementById("scan-progress-fill");
+        const label = document.getElementById("scan-progress-label");
+
+        if (progress && progress.phase && progress.total > 0) {
+            wrap.classList.remove("hidden");
+            fill.style.width = progress.percent + "%";
+
+            const phaseName = progress.phase === "search" ? "Searching" : "Checking stores";
+            let etaText = "";
+            if (progress.eta_seconds != null) {
+                const mins = Math.floor(progress.eta_seconds / 60);
+                const secs = progress.eta_seconds % 60;
+                etaText = mins > 0 ? ` — ~${mins}m ${secs}s left` : ` — ~${secs}s left`;
+            }
+            label.textContent = `${phaseName}: ${progress.current}/${progress.total} (${progress.percent}%)${etaText}`;
+        } else {
+            wrap.classList.add("hidden");
+        }
     }
 
     function hideScanBanner() {
         scanBanner.classList.add("hidden");
+        document.getElementById("scan-progress-wrap").classList.add("hidden");
     }
 
     function startScanPolling() {
@@ -375,11 +396,18 @@
                         showScanBanner(`Scan complete! ${data.last_result.new_finds} new find(s)!`);
                         setTimeout(hideScanBanner, 5000);
                     }
+                } else if (data.progress) {
+                    const p = data.progress;
+                    const phaseName = p.phase === "search" ? "Searching FWGS" : "Checking store inventory";
+                    showScanBanner(
+                        p.detail ? `${phaseName}: ${p.detail}` : `${phaseName}...`,
+                        p
+                    );
                 }
             } catch (e) {
                 console.error("Poll error:", e);
             }
-        }, 3000);
+        }, 2000);
     }
 
     function pollScanStatus() {
@@ -388,7 +416,7 @@
             .then(r => r.json())
             .then(data => {
                 if (data.running) {
-                    showScanBanner("Scan in progress...");
+                    showScanBanner("Scan in progress...", data.progress);
                     startScanPolling();
                 }
             })

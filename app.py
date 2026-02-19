@@ -1,6 +1,7 @@
 import json
 import logging
 import threading
+import time as _time
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request
 from config import Config
@@ -33,6 +34,7 @@ app.config.from_object(Config)
 scanner_lock = threading.Lock()
 scanner_running = False
 last_scan_result = None
+scan_progress = None  # dict updated by scanner callback
 
 
 def init_app():
@@ -168,10 +170,33 @@ def api_start_scan():
     scan_type = request.json.get("type", "full") if request.is_json else "full"
     tier = request.json.get("tier") if request.is_json else None
 
+    def _update_progress(p):
+        global scan_progress
+        now = _time.time()
+        started = scan_progress["started_at"] if scan_progress else now
+        elapsed = now - started
+        pct = (p["current"] / p["total"] * 100) if p["total"] else 0
+        eta = None
+        if p["current"] > 1 and pct > 0:
+            eta = round(elapsed / pct * (100 - pct))
+        scan_progress = {
+            "phase": p["phase"],
+            "current": p["current"],
+            "total": p["total"],
+            "detail": p.get("detail", ""),
+            "percent": round(pct, 1),
+            "elapsed": round(elapsed),
+            "eta_seconds": eta,
+            "started_at": started,
+        }
+
     def run_scan():
-        global scanner_running, last_scan_result
+        global scanner_running, last_scan_result, scan_progress
+        scan_progress = {"phase": "starting", "current": 0, "total": 0,
+                         "detail": "", "percent": 0, "elapsed": 0,
+                         "eta_seconds": None, "started_at": _time.time()}
         try:
-            scanner = FWGSScanner()
+            scanner = FWGSScanner(on_progress=_update_progress)
             if scan_type == "quick":
                 result = scanner.run_quick_scan(tier=tier)
             else:
@@ -189,6 +214,7 @@ def api_start_scan():
         finally:
             with scanner_lock:
                 scanner_running = False
+            scan_progress = None
 
     with scanner_lock:
         scanner_running = True
@@ -201,9 +227,13 @@ def api_start_scan():
 
 @app.route("/api/scan/status")
 def api_scan_status():
+    progress = None
+    if scan_progress:
+        progress = {k: v for k, v in scan_progress.items() if k != "started_at"}
     return jsonify({
         "running": scanner_running,
         "last_result": last_scan_result,
+        "progress": progress,
     })
 
 
@@ -281,14 +311,17 @@ def start_scheduler():
     import time
 
     def scheduled_scan():
-        global scanner_running, last_scan_result
+        global scanner_running, last_scan_result, scan_progress
         if scanner_running:
             logger.info("Scheduled scan skipped — already running")
             return
         with scanner_lock:
             scanner_running = True
+        scan_progress = {"phase": "starting", "current": 0, "total": 0,
+                         "detail": "", "percent": 0, "elapsed": 0,
+                         "eta_seconds": None, "started_at": _time.time()}
         try:
-            scanner = FWGSScanner()
+            scanner = FWGSScanner(on_progress=_update_progress)
             result = scanner.run_full_scan()
             last_scan_result = result
             if result.get("new_finds", 0) > 0:
@@ -298,6 +331,7 @@ def start_scheduler():
         finally:
             with scanner_lock:
                 scanner_running = False
+            scan_progress = None
 
     interval = Config.SCAN_INTERVAL_MINUTES
     schedule.every(interval).minutes.do(scheduled_scan)
