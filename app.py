@@ -14,6 +14,10 @@ from knowledge.bourbon_db import (
     load_knowledge_base, get_tier_label,
 )
 from scanner.fwgs_scraper import FWGSScanner
+from scanner.store_locator import (
+    geocode_zip, get_nearby_stores, get_store_info, fetch_all_stores,
+    haversine_miles,
+)
 from notifications.notifier import notify_scan_results, test_notifications
 
 logging.basicConfig(
@@ -77,6 +81,71 @@ def api_inventory():
     bourbon_id = request.args.get("bourbon_id")
     inventory = get_latest_inventory(bourbon_id)
     return jsonify(inventory)
+
+
+@app.route("/api/inventory/nearby")
+def api_inventory_nearby():
+    """Get inventory filtered by proximity to a zip code or lat/lng."""
+    zip_code = request.args.get("zip", "").strip()
+    lat = request.args.get("lat", type=float)
+    lng = request.args.get("lng", type=float)
+    radius = request.args.get("radius", 25, type=float)
+
+    if zip_code:
+        lat, lng = geocode_zip(zip_code)
+        if lat is None:
+            return jsonify({"error": f"Could not locate zip code {zip_code}"}), 400
+    elif lat is None or lng is None:
+        return jsonify({"error": "Provide zip or lat/lng parameters"}), 400
+
+    # Get stores within radius
+    nearby = get_nearby_stores(lat, lng, radius_miles=radius)
+    nearby_ids = {s["store_number"] for s in nearby}
+    dist_map = {s["store_number"]: s["distance_miles"] for s in nearby}
+
+    # Get inventory and filter to nearby stores
+    inventory = get_latest_inventory()
+    filtered = []
+    for item in inventory:
+        snum = item.get("store_number", "")
+        if snum in nearby_ids:
+            item["distance_miles"] = dist_map.get(snum, 0)
+            # Enrich with store details
+            store = get_store_info(snum)
+            if store:
+                item["county"] = store.get("county", "")
+                item["store_hours"] = store.get("hours", "")
+                item["store_phone"] = store.get("phone", "")
+            filtered.append(item)
+
+    filtered.sort(key=lambda x: (x.get("distance_miles", 999)))
+    return jsonify({
+        "location": {"lat": lat, "lng": lng, "zip": zip_code, "radius": radius},
+        "stores_in_range": len(nearby),
+        "inventory": filtered,
+    })
+
+
+@app.route("/api/stores/nearby")
+def api_stores_nearby():
+    """Get store locations near a zip code or lat/lng (no inventory filter)."""
+    zip_code = request.args.get("zip", "").strip()
+    lat = request.args.get("lat", type=float)
+    lng = request.args.get("lng", type=float)
+    radius = request.args.get("radius", 25, type=float)
+
+    if zip_code:
+        lat, lng = geocode_zip(zip_code)
+        if lat is None:
+            return jsonify({"error": f"Could not locate zip code {zip_code}"}), 400
+    elif lat is None or lng is None:
+        return jsonify({"error": "Provide zip or lat/lng parameters"}), 400
+
+    nearby = get_nearby_stores(lat, lng, radius_miles=radius)
+    return jsonify({
+        "location": {"lat": lat, "lng": lng, "zip": zip_code, "radius": radius},
+        "stores": nearby,
+    })
 
 
 @app.route("/api/scan/history")

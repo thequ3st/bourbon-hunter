@@ -59,9 +59,23 @@
             <label>Show:</label>
             <button class="filter-btn active" data-show="all">All</button>
             <button class="filter-btn" data-show="in-stock">In Stock Only</button>
+            <button class="filter-btn" data-show="nearby">Near Me</button>
         </div>
         <div class="filters__group">
             <input type="text" id="search-input" class="search-input" placeholder="Search bourbons...">
+        </div>
+        <div class="filters__group filters__location hidden" id="location-filter">
+            <label>Location:</label>
+            <input type="text" id="zip-input" class="search-input" placeholder="Zip code" maxlength="5" style="width:100px">
+            <select id="radius-select" class="search-input" style="width:auto">
+                <option value="10">10 mi</option>
+                <option value="25" selected>25 mi</option>
+                <option value="50">50 mi</option>
+                <option value="100">100 mi</option>
+            </select>
+            <button id="btn-use-location" class="btn btn--ghost" title="Use current location" style="padding:6px 10px">📍 Use GPS</button>
+            <button id="btn-apply-location" class="btn btn--accent" style="padding:6px 12px">Search</button>
+            <span id="location-status" style="font-size:0.8rem;color:var(--text-muted);margin-left:8px"></span>
         </div>
     </section>
 

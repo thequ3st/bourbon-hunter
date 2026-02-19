@@ -1,3 +1,4 @@
+import math
 import logging
 import requests
 from config import Config
@@ -146,3 +147,66 @@ def get_stores_by_county(county_name):
         s for s in _store_cache.values()
         if s.get("county", "").lower() == county_name.lower()
     ]
+
+
+def haversine_miles(lat1, lon1, lat2, lon2):
+    """Calculate distance in miles between two lat/lng points."""
+    R = 3958.8  # Earth radius in miles
+    lat1, lon1, lat2, lon2 = (math.radians(v) for v in (lat1, lon1, lat2, lon2))
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    return R * 2 * math.asin(math.sqrt(a))
+
+
+def geocode_zip(zip_code):
+    """Convert a US zip code to lat/lng using the Census geocoder."""
+    try:
+        url = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
+        params = {
+            "address": f"{zip_code}",
+            "benchmark": "Public_AR_Current",
+            "format": "json",
+        }
+        resp = requests.get(url, params=params, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            matches = data.get("result", {}).get("addressMatches", [])
+            if matches:
+                coords = matches[0].get("coordinates", {})
+                return coords.get("y"), coords.get("x")  # lat, lng
+    except requests.RequestException:
+        pass
+
+    # Fallback: find a store in this zip code and use its coordinates
+    if not _store_cache:
+        fetch_all_stores()
+    for store in _store_cache.values():
+        if store.get("zip", "").startswith(zip_code[:3]):
+            lat, lng = store.get("latitude"), store.get("longitude")
+            if lat and lng:
+                return lat, lng
+
+    return None, None
+
+
+def get_nearby_stores(lat, lng, radius_miles=25):
+    """Get all stores within radius_miles of a lat/lng point, sorted by distance."""
+    if not _store_cache:
+        fetch_all_stores()
+
+    nearby = []
+    for store in _store_cache.values():
+        slat = store.get("latitude")
+        slng = store.get("longitude")
+        if slat is None or slng is None:
+            continue
+        dist = haversine_miles(lat, lng, slat, slng)
+        if dist <= radius_miles:
+            nearby.append({
+                **store,
+                "distance_miles": round(dist, 1),
+            })
+
+    nearby.sort(key=lambda s: s["distance_miles"])
+    return nearby

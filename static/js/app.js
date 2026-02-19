@@ -6,6 +6,8 @@
     // State
     let allBourbons = [];
     let inventory = [];
+    let nearbyInventory = null; // null = not in nearby mode, [] = nearby mode active
+    let userLocation = null; // { lat, lng, zip, radius }
     let currentTierFilter = "all";
     let currentShowFilter = "all";
     let searchQuery = "";
@@ -28,6 +30,7 @@
         setupSearch();
         setupScanButtons();
         setupModal();
+        setupLocationFilter();
         pollScanStatus();
     }
 
@@ -133,7 +136,7 @@
                 <div class="bourbon-card__stock-status">
                     <span class="stock-dot ${hasStock ? 'stock-dot--in' : 'stock-dot--out'}"></span>
                     ${hasStock
-                        ? `<span style="color: var(--tier4)">In stock at ${stockInfo.length} store${stockInfo.length > 1 ? "s" : ""}</span>`
+                        ? nearbyStockLabel(stockInfo)
                         : '<span style="color: var(--text-muted)">Not found in FWGS</span>'
                     }
                 </div>
@@ -178,6 +181,10 @@
             if (currentTierFilter !== "all" && b.rarity_tier !== parseInt(currentTierFilter)) return false;
             // In-stock filter
             if (currentShowFilter === "in-stock" && getStockInfo(b.id).length === 0) return false;
+            // Nearby filter — only show bourbons with nearby stock
+            if (currentShowFilter === "nearby" && nearbyInventory !== null) {
+                if (!nearbyInventory.some(inv => inv.bourbon_id === b.id)) return false;
+            }
             // Search
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
@@ -205,6 +212,15 @@
                 document.querySelectorAll("[data-show]").forEach(b => b.classList.remove("active"));
                 btn.classList.add("active");
                 currentShowFilter = btn.dataset.show;
+
+                const locFilter = document.getElementById("location-filter");
+                if (btn.dataset.show === "nearby") {
+                    locFilter.classList.remove("hidden");
+                } else {
+                    locFilter.classList.add("hidden");
+                    nearbyInventory = null;
+                    userLocation = null;
+                }
                 renderGrid();
             });
         });
@@ -220,6 +236,81 @@
                 renderGrid();
             }, 250);
         });
+    }
+
+    // ---- Location Filter ----
+
+    function setupLocationFilter() {
+        const btnGPS = document.getElementById("btn-use-location");
+        const btnSearch = document.getElementById("btn-apply-location");
+        const zipInput = document.getElementById("zip-input");
+        const statusEl = document.getElementById("location-status");
+
+        btnGPS.addEventListener("click", () => {
+            if (!navigator.geolocation) {
+                statusEl.textContent = "GPS not supported";
+                return;
+            }
+            statusEl.textContent = "Getting location...";
+            btnGPS.disabled = true;
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    btnGPS.disabled = false;
+                    const radius = parseInt(document.getElementById("radius-select").value);
+                    statusEl.textContent = `Located (${pos.coords.latitude.toFixed(2)}, ${pos.coords.longitude.toFixed(2)})`;
+                    loadNearbyInventory({ lat: pos.coords.latitude, lng: pos.coords.longitude, radius });
+                },
+                (err) => {
+                    btnGPS.disabled = false;
+                    statusEl.textContent = "Location denied";
+                    console.error("Geolocation error:", err);
+                },
+                { timeout: 10000 }
+            );
+        });
+
+        btnSearch.addEventListener("click", () => {
+            const zip = zipInput.value.trim();
+            if (!zip || zip.length < 5) {
+                statusEl.textContent = "Enter a 5-digit zip";
+                return;
+            }
+            const radius = parseInt(document.getElementById("radius-select").value);
+            statusEl.textContent = "Searching...";
+            loadNearbyInventory({ zip, radius });
+        });
+
+        zipInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") btnSearch.click();
+        });
+    }
+
+    async function loadNearbyInventory({ lat, lng, zip, radius }) {
+        const statusEl = document.getElementById("location-status");
+        try {
+            let url = `/api/inventory/nearby?radius=${radius}`;
+            if (zip) {
+                url += `&zip=${encodeURIComponent(zip)}`;
+            } else if (lat != null && lng != null) {
+                url += `&lat=${lat}&lng=${lng}`;
+            }
+
+            const resp = await fetch(url);
+            const data = await resp.json();
+
+            if (!resp.ok) {
+                statusEl.textContent = data.error || "Search failed";
+                return;
+            }
+
+            nearbyInventory = data.inventory || [];
+            userLocation = data.location;
+            statusEl.textContent = `${data.stores_in_range} stores within ${radius} mi — ${nearbyInventory.length} items`;
+            renderGrid();
+        } catch (e) {
+            statusEl.textContent = "Network error";
+            console.error("Nearby inventory error:", e);
+        }
     }
 
     // ---- Scan Controls ----
@@ -357,17 +448,23 @@
         `;
 
         if (stockInfo.length > 0) {
+            const isNearby = currentShowFilter === "nearby" && nearbyInventory !== null;
+            const headerLabel = isNearby
+                ? `Nearby Stores (${stockInfo.length})`
+                : `In Stock (${stockInfo.length} store${stockInfo.length > 1 ? "s" : ""})`;
             html += `
-                <h3 style="margin-top: 20px; color: var(--tier4);">In Stock (${stockInfo.length} store${stockInfo.length > 1 ? "s" : ""})</h3>
+                <h3 style="margin-top: 20px; color: var(--tier4);">${headerLabel}</h3>
                 <div class="store-list">
                     ${stockInfo.map(s => `
                         <div class="store-item">
                             <div>
                                 <strong>${esc(s.store_name || "Store #" + s.store_number)}</strong>
                                 <div style="font-size: 0.75rem; color: var(--text-muted)">${esc(s.store_address || "")}</div>
+                                ${s.county ? `<div style="font-size: 0.7rem; color: var(--text-muted)">${esc(s.county)} County</div>` : ""}
                             </div>
                             <div style="text-align: right;">
                                 <div style="font-weight: 700; color: var(--tier4)">Qty: ${s.quantity}</div>
+                                ${s.distance_miles != null ? `<div style="font-size: 0.8rem; color: var(--accent-gold)">${s.distance_miles} mi</div>` : ""}
                                 ${s.price ? `<div style="font-size: 0.8rem;">$${s.price}</div>` : ""}
                             </div>
                         </div>
@@ -389,7 +486,21 @@
 
     // ---- Helpers ----
 
+    function nearbyStockLabel(stockInfo) {
+        if (currentShowFilter === "nearby" && nearbyInventory !== null && stockInfo.length > 0) {
+            const closest = stockInfo.reduce((a, b) =>
+                (a.distance_miles || 999) < (b.distance_miles || 999) ? a : b
+            );
+            const dist = closest.distance_miles != null ? closest.distance_miles + " mi" : "";
+            return `<span style="color: var(--tier4)">In stock at ${stockInfo.length} nearby store${stockInfo.length > 1 ? "s" : ""}${dist ? " — closest " + dist : ""}</span>`;
+        }
+        return `<span style="color: var(--tier4)">In stock at ${stockInfo.length} store${stockInfo.length > 1 ? "s" : ""}</span>`;
+    }
+
     function getStockInfo(bourbonId) {
+        if (currentShowFilter === "nearby" && nearbyInventory !== null) {
+            return nearbyInventory.filter(inv => inv.bourbon_id === bourbonId);
+        }
         return inventory.filter(inv => inv.bourbon_id === bourbonId);
     }
 

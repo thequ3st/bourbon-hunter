@@ -225,6 +225,18 @@ body {
 .search-input:focus { border-color: var(--accent-gold); }
 .search-input::placeholder { color: var(--text-muted); }
 
+/* Location Filter */
+.filters__location {
+    width: 100%;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+
+.filters__location .search-input {
+    width: auto;
+}
+
 /* Bourbon Grid */
 .bourbon-grid {
     display: grid;
