@@ -5,12 +5,189 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings — PA Bourbon Hunter</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .onboard-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            margin: 16px 0;
+            overflow: hidden;
+        }
+        .onboard-section__header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .onboard-section__header:hover { background: var(--bg-card-hover); }
+        .onboard-section__title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: Georgia, serif;
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+        .onboard-section__arrow {
+            color: var(--text-muted);
+            transition: transform 0.2s;
+            font-size: 0.8rem;
+        }
+        .onboard-section.open .onboard-section__arrow { transform: rotate(90deg); }
+        .onboard-section__body {
+            display: none;
+            padding: 0 20px 20px;
+            border-top: 1px solid var(--border);
+        }
+        .onboard-section.open .onboard-section__body { display: block; }
+
+        .form-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 14px;
+        }
+        .form-row label {
+            min-width: 140px;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+        .form-row input[type="text"],
+        .form-row input[type="password"],
+        .form-row input[type="email"],
+        .form-row input[type="number"],
+        .form-row select {
+            flex: 1;
+            padding: 8px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            outline: none;
+        }
+        .form-row input:focus, .form-row select:focus {
+            border-color: var(--accent-gold);
+        }
+        .form-row input::placeholder { color: var(--text-muted); }
+
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 14px;
+        }
+        .toggle {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle__slider {
+            position: absolute;
+            inset: 0;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .toggle__slider::before {
+            content: "";
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            left: 2px;
+            top: 2px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+        .toggle input:checked + .toggle__slider {
+            background: rgba(76, 175, 80, 0.2);
+            border-color: var(--tier4);
+        }
+        .toggle input:checked + .toggle__slider::before {
+            transform: translateX(20px);
+            background: var(--tier4);
+        }
+
+        .form-hint {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+            padding-left: 152px;
+        }
+
+        .save-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+        .save-msg {
+            font-size: 0.82rem;
+            color: var(--tier4);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .save-msg.show { opacity: 1; }
+
+        /* Tier checkboxes */
+        .tier-grid {
+            display: grid;
+            grid-template-columns: 160px repeat(5, 1fr);
+            gap: 0;
+            margin-top: 14px;
+            font-size: 0.82rem;
+        }
+        .tier-grid .tg-header {
+            padding: 8px 6px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-size: 0.68rem;
+            letter-spacing: 1px;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+        .tier-grid .tg-header:first-child { text-align: left; }
+        .tier-grid .tg-cell {
+            padding: 10px 6px;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+        .tier-grid .tg-cell:first-child { text-align: left; }
+        .tier-grid input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent-gold);
+            cursor: pointer;
+        }
+
+        .pw-toggle {
+            padding: 4px 8px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.75rem;
+            flex-shrink: 0;
+        }
+        .pw-toggle:hover { color: var(--text-primary); }
+    </style>
 </head>
 <body>
     <header class="header">
         <div class="header__brand">
             <h1 class="header__title">PA Bourbon Hunter</h1>
-            <p class="header__subtitle">Settings</p>
+            <p class="header__subtitle">Settings & Setup</p>
         </div>
         <nav class="header__nav">
             <a href="/" class="btn btn--ghost">Back to Dashboard</a>
@@ -18,149 +195,347 @@
     </header>
 
     <main class="settings-page">
-        <!-- Notification Channels -->
-        <section class="settings-section">
-            <h2 class="section-title">Notification Channels</h2>
-            <p class="settings-hint">Configure in your <code>.env</code> file, then restart the app.</p>
 
-            <div class="settings-grid" id="notification-status">
-                <div class="setting-card">
-                    <h3>Email (SMTP)</h3>
-                    <span class="status-badge" id="email-status">Loading...</span>
-                    <p class="setting-desc">Sends HTML email alerts via SMTP</p>
+        <!-- Email -->
+        <div class="onboard-section" id="section-email">
+            <div class="onboard-section__header" onclick="toggleSection('section-email')">
+                <div class="onboard-section__title">
+                    <span id="email-badge" class="status-badge status--off">Off</span>
+                    Email Alerts (SMTP)
                 </div>
-                <div class="setting-card">
-                    <h3>SMS (Twilio)</h3>
-                    <span class="status-badge" id="sms-status">Loading...</span>
-                    <p class="setting-desc">Text message alerts via Twilio</p>
+                <span class="onboard-section__arrow">&#9654;</span>
+            </div>
+            <div class="onboard-section__body">
+                <div class="toggle-row">
+                    <label class="toggle">
+                        <input type="checkbox" id="set-email_enabled">
+                        <span class="toggle__slider"></span>
+                    </label>
+                    <span style="font-size:0.85rem">Enable email notifications</span>
                 </div>
-                <div class="setting-card">
-                    <h3>Discord Webhook</h3>
-                    <span class="status-badge" id="discord-status">Loading...</span>
-                    <p class="setting-desc">Rich embed alerts to Discord channel</p>
+                <div class="form-row">
+                    <label>SMTP Host</label>
+                    <input type="text" id="set-smtp_host" placeholder="smtp.gmail.com">
                 </div>
-                <div class="setting-card">
-                    <h3>Slack Webhook</h3>
-                    <span class="status-badge" id="slack-status">Loading...</span>
-                    <p class="setting-desc">Block Kit alerts to Slack channel</p>
+                <div class="form-row">
+                    <label>SMTP Port</label>
+                    <input type="number" id="set-smtp_port" placeholder="587" style="max-width:100px">
+                </div>
+                <div class="form-row">
+                    <label>SMTP User</label>
+                    <input type="email" id="set-smtp_user" placeholder="you@gmail.com">
+                </div>
+                <div class="form-row">
+                    <label>SMTP Password</label>
+                    <input type="password" id="set-smtp_password" placeholder="App password">
+                    <button class="pw-toggle" onclick="togglePw('set-smtp_password')">Show</button>
+                </div>
+                <div class="form-hint">For Gmail, use an App Password (not your account password)</div>
+                <div class="form-row">
+                    <label>Send Alerts To</label>
+                    <input type="email" id="set-email_to" placeholder="your@email.com">
+                </div>
+                <div class="save-bar">
+                    <button class="btn btn--accent" onclick="saveSection('email')">Save Email Settings</button>
+                    <button class="btn btn--ghost" onclick="testChannel('email')">Test</button>
+                    <span class="save-msg" id="msg-email"></span>
                 </div>
             </div>
+        </div>
 
-            <button id="btn-test-notifications" class="btn btn--accent">
-                Test All Notifications
-            </button>
-            <div id="test-results" class="test-results hidden"></div>
-        </section>
+        <!-- SMS -->
+        <div class="onboard-section" id="section-sms">
+            <div class="onboard-section__header" onclick="toggleSection('section-sms')">
+                <div class="onboard-section__title">
+                    <span id="sms-badge" class="status-badge status--off">Off</span>
+                    SMS Alerts (Twilio)
+                </div>
+                <span class="onboard-section__arrow">&#9654;</span>
+            </div>
+            <div class="onboard-section__body">
+                <div class="toggle-row">
+                    <label class="toggle">
+                        <input type="checkbox" id="set-sms_enabled">
+                        <span class="toggle__slider"></span>
+                    </label>
+                    <span style="font-size:0.85rem">Enable SMS notifications</span>
+                </div>
+                <div class="form-row">
+                    <label>Account SID</label>
+                    <input type="text" id="set-twilio_account_sid" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+                </div>
+                <div class="form-row">
+                    <label>Auth Token</label>
+                    <input type="password" id="set-twilio_auth_token" placeholder="Twilio auth token">
+                    <button class="pw-toggle" onclick="togglePw('set-twilio_auth_token')">Show</button>
+                </div>
+                <div class="form-row">
+                    <label>From Number</label>
+                    <input type="text" id="set-twilio_from_number" placeholder="+1234567890">
+                </div>
+                <div class="form-row">
+                    <label>To Number</label>
+                    <input type="text" id="set-sms_to_number" placeholder="+1234567890">
+                </div>
+                <div class="save-bar">
+                    <button class="btn btn--accent" onclick="saveSection('sms')">Save SMS Settings</button>
+                    <button class="btn btn--ghost" onclick="testChannel('sms')">Test</button>
+                    <span class="save-msg" id="msg-sms"></span>
+                </div>
+            </div>
+        </div>
 
-        <!-- Tier Notification Map -->
-        <section class="settings-section">
-            <h2 class="section-title">Tier Alert Routing</h2>
-            <p class="settings-hint">Which channels fire for each rarity tier</p>
+        <!-- Discord -->
+        <div class="onboard-section" id="section-discord">
+            <div class="onboard-section__header" onclick="toggleSection('section-discord')">
+                <div class="onboard-section__title">
+                    <span id="discord-badge" class="status-badge status--off">Off</span>
+                    Discord Alerts
+                </div>
+                <span class="onboard-section__arrow">&#9654;</span>
+            </div>
+            <div class="onboard-section__body">
+                <div class="toggle-row">
+                    <label class="toggle">
+                        <input type="checkbox" id="set-discord_enabled">
+                        <span class="toggle__slider"></span>
+                    </label>
+                    <span style="font-size:0.85rem">Enable Discord notifications</span>
+                </div>
+                <div class="form-row">
+                    <label>Webhook URL</label>
+                    <input type="text" id="set-discord_webhook_url" placeholder="https://discord.com/api/webhooks/...">
+                </div>
+                <div class="form-hint">Server Settings > Integrations > Webhooks > New Webhook > Copy URL</div>
+                <div class="save-bar">
+                    <button class="btn btn--accent" onclick="saveSection('discord')">Save Discord Settings</button>
+                    <button class="btn btn--ghost" onclick="testChannel('discord')">Test</button>
+                    <span class="save-msg" id="msg-discord"></span>
+                </div>
+            </div>
+        </div>
 
-            <table class="tier-table">
-                <thead>
-                    <tr>
-                        <th>Tier</th>
-                        <th>Email</th>
-                        <th>SMS</th>
-                        <th>Discord</th>
-                        <th>Slack</th>
-                        <th>Dashboard</th>
-                    </tr>
-                </thead>
-                <tbody id="tier-map-body">
-                </tbody>
-            </table>
-        </section>
+        <!-- Slack -->
+        <div class="onboard-section" id="section-slack">
+            <div class="onboard-section__header" onclick="toggleSection('section-slack')">
+                <div class="onboard-section__title">
+                    <span id="slack-badge" class="status-badge status--off">Off</span>
+                    Slack Alerts
+                </div>
+                <span class="onboard-section__arrow">&#9654;</span>
+            </div>
+            <div class="onboard-section__body">
+                <div class="toggle-row">
+                    <label class="toggle">
+                        <input type="checkbox" id="set-slack_enabled">
+                        <span class="toggle__slider"></span>
+                    </label>
+                    <span style="font-size:0.85rem">Enable Slack notifications</span>
+                </div>
+                <div class="form-row">
+                    <label>Webhook URL</label>
+                    <input type="text" id="set-slack_webhook_url" placeholder="https://hooks.slack.com/services/...">
+                </div>
+                <div class="form-hint">Your App > Incoming Webhooks > Add New Webhook to Workspace</div>
+                <div class="save-bar">
+                    <button class="btn btn--accent" onclick="saveSection('slack')">Save Slack Settings</button>
+                    <button class="btn btn--ghost" onclick="testChannel('slack')">Test</button>
+                    <span class="save-msg" id="msg-slack"></span>
+                </div>
+            </div>
+        </div>
 
         <!-- Scan Settings -->
-        <section class="settings-section">
-            <h2 class="section-title">Scan Settings</h2>
-            <div class="settings-grid">
-                <div class="setting-card">
-                    <h3>Scan Interval</h3>
-                    <p class="setting-value" id="scan-interval">—</p>
-                    <p class="setting-desc">Minutes between automated scans</p>
+        <div class="onboard-section open" id="section-scan">
+            <div class="onboard-section__header" onclick="toggleSection('section-scan')">
+                <div class="onboard-section__title">
+                    Scan Settings
                 </div>
-                <div class="setting-card">
-                    <h3>Alert Cooldown</h3>
-                    <p class="setting-value" id="alert-cooldown">—</p>
-                    <p class="setting-desc">Hours between repeat alerts for same product</p>
+                <span class="onboard-section__arrow">&#9654;</span>
+            </div>
+            <div class="onboard-section__body">
+                <div class="form-row">
+                    <label>Scan Interval</label>
+                    <input type="number" id="set-scan_interval_minutes" min="15" max="1440" style="max-width:100px">
+                    <span style="font-size:0.82rem;color:var(--text-muted)">minutes</span>
+                </div>
+                <div class="form-hint">How often the background scanner runs (min 15)</div>
+                <div class="form-row">
+                    <label>Alert Cooldown</label>
+                    <input type="number" id="set-alert_cooldown_hours" min="1" max="72" style="max-width:100px">
+                    <span style="font-size:0.82rem;color:var(--text-muted)">hours</span>
+                </div>
+                <div class="form-hint">Minimum hours between repeat alerts for the same product</div>
+                <div class="form-row">
+                    <label>Request Delay</label>
+                    <input type="number" id="set-request_delay_seconds" min="1" max="10" step="0.5" style="max-width:100px">
+                    <span style="font-size:0.82rem;color:var(--text-muted)">seconds</span>
+                </div>
+                <div class="form-hint">Delay between FWGS requests (be polite, keep above 2s)</div>
+                <div class="save-bar">
+                    <button class="btn btn--accent" onclick="saveSection('scan')">Save Scan Settings</button>
+                    <span class="save-msg" id="msg-scan"></span>
                 </div>
             </div>
-        </section>
+        </div>
+
+        <!-- Tier Alert Routing -->
+        <div class="onboard-section open" id="section-tiers">
+            <div class="onboard-section__header" onclick="toggleSection('section-tiers')">
+                <div class="onboard-section__title">
+                    Tier Alert Routing
+                </div>
+                <span class="onboard-section__arrow">&#9654;</span>
+            </div>
+            <div class="onboard-section__body">
+                <p style="font-size:0.82rem;color:var(--text-muted);margin-top:8px">Choose which channels fire for each rarity tier</p>
+                <div class="tier-grid">
+                    <div class="tg-header">Tier</div>
+                    <div class="tg-header">Email</div>
+                    <div class="tg-header">SMS</div>
+                    <div class="tg-header">Discord</div>
+                    <div class="tg-header">Slack</div>
+                    <div class="tg-header">Dashboard</div>
+                </div>
+                <div class="tier-grid" id="tier-checkboxes"></div>
+                <div class="save-bar">
+                    <button class="btn btn--accent" onclick="saveTierMap()">Save Tier Routing</button>
+                    <span class="save-msg" id="msg-tiers"></span>
+                </div>
+            </div>
+        </div>
 
         <!-- Knowledge Base Info -->
-        <section class="settings-section">
-            <h2 class="section-title">Knowledge Base</h2>
-            <div class="settings-grid" id="kb-stats">
-                <div class="setting-card">
-                    <h3>Total Bourbons</h3>
-                    <p class="setting-value" id="kb-total">—</p>
+        <div class="onboard-section" id="section-kb">
+            <div class="onboard-section__header" onclick="toggleSection('section-kb')">
+                <div class="onboard-section__title">
+                    Knowledge Base
                 </div>
-                <div class="setting-card">
-                    <h3>Tier 1 (Unicorn)</h3>
-                    <p class="setting-value" id="kb-tier1">—</p>
-                </div>
-                <div class="setting-card">
-                    <h3>Tier 2 (Highly Allocated)</h3>
-                    <p class="setting-value" id="kb-tier2">—</p>
-                </div>
-                <div class="setting-card">
-                    <h3>Tier 3 (Allocated)</h3>
-                    <p class="setting-value" id="kb-tier3">—</p>
-                </div>
-                <div class="setting-card">
-                    <h3>Tier 4 (Worth Tracking)</h3>
-                    <p class="setting-value" id="kb-tier4">—</p>
+                <span class="onboard-section__arrow">&#9654;</span>
+            </div>
+            <div class="onboard-section__body">
+                <div class="settings-grid" style="margin-top:14px">
+                    <div class="setting-card">
+                        <h3>Total Bourbons</h3>
+                        <p class="setting-value" id="kb-total">--</p>
+                    </div>
+                    <div class="setting-card">
+                        <h3>Tier 1 (Unicorn)</h3>
+                        <p class="setting-value" id="kb-tier1">--</p>
+                    </div>
+                    <div class="setting-card">
+                        <h3>Tier 2 (Highly Allocated)</h3>
+                        <p class="setting-value" id="kb-tier2">--</p>
+                    </div>
+                    <div class="setting-card">
+                        <h3>Tier 3 (Allocated)</h3>
+                        <p class="setting-value" id="kb-tier3">--</p>
+                    </div>
+                    <div class="setting-card">
+                        <h3>Tier 4 (Worth Tracking)</h3>
+                        <p class="setting-value" id="kb-tier4">--</p>
+                    </div>
                 </div>
             </div>
-        </section>
+        </div>
+
     </main>
 
     <footer class="footer">
-        <p>PA Bourbon Hunter v1.0</p>
+        <p>PA Bourbon Hunter v1.1-dev</p>
     </footer>
 
     <script>
-        document.addEventListener("DOMContentLoaded", async () => {
-            // Load settings
+    (function () {
+        "use strict";
+
+        let settings = {};
+
+        // Section field maps
+        const SECTIONS = {
+            email: ["email_enabled", "smtp_host", "smtp_port", "smtp_user", "smtp_password", "email_to"],
+            sms: ["sms_enabled", "twilio_account_sid", "twilio_auth_token", "twilio_from_number", "sms_to_number"],
+            discord: ["discord_enabled", "discord_webhook_url"],
+            slack: ["slack_enabled", "slack_webhook_url"],
+            scan: ["scan_interval_minutes", "alert_cooldown_hours", "request_delay_seconds"],
+        };
+
+        const TIER_LABELS = {1: "Unicorn", 2: "Highly Allocated", 3: "Allocated", 4: "Worth Tracking"};
+        const CHANNELS = ["email", "sms", "discord", "slack", "dashboard"];
+
+        document.addEventListener("DOMContentLoaded", init);
+
+        async function init() {
             const resp = await fetch("/api/settings");
-            const settings = await resp.json();
+            settings = await resp.json();
+            populateFields();
+            buildTierGrid();
+            loadKBStats();
+        }
 
-            // Channel status
-            const channels = ["email", "sms", "discord", "slack"];
-            channels.forEach(ch => {
-                const el = document.getElementById(`${ch}-status`);
-                const enabled = settings[`${ch}_enabled`];
-                el.textContent = enabled ? "Enabled" : "Disabled";
-                el.classList.add(enabled ? "status--on" : "status--off");
-            });
+        function populateFields() {
+            // Simple fields
+            const fieldMap = {
+                "set-email_enabled": settings.email_enabled,
+                "set-smtp_host": settings.smtp_host,
+                "set-smtp_port": settings.smtp_port,
+                "set-smtp_user": settings.smtp_user,
+                "set-smtp_password": settings.smtp_password,
+                "set-email_to": settings.email_to,
+                "set-sms_enabled": settings.sms_enabled,
+                "set-twilio_account_sid": settings.twilio_account_sid,
+                "set-twilio_auth_token": settings.twilio_auth_token,
+                "set-twilio_from_number": settings.twilio_from_number,
+                "set-sms_to_number": settings.sms_to_number,
+                "set-discord_enabled": settings.discord_enabled,
+                "set-discord_webhook_url": settings.discord_webhook_url,
+                "set-slack_enabled": settings.slack_enabled,
+                "set-slack_webhook_url": settings.slack_webhook_url,
+                "set-scan_interval_minutes": settings.scan_interval,
+                "set-alert_cooldown_hours": settings.alert_cooldown,
+                "set-request_delay_seconds": settings.request_delay,
+            };
 
-            // Scan settings
-            document.getElementById("scan-interval").textContent = `${settings.scan_interval} min`;
-            document.getElementById("alert-cooldown").textContent = `${settings.alert_cooldown} hrs`;
-
-            // Tier map
-            const tierBody = document.getElementById("tier-map-body");
-            const tierLabels = {1: "Unicorn", 2: "Highly Allocated", 3: "Allocated", 4: "Worth Tracking"};
-            for (let tier = 1; tier <= 4; tier++) {
-                const channels = settings.tier_map[tier] || [];
-                const row = document.createElement("tr");
-                row.innerHTML = `
-                    <td><span class="tier-badge tier-badge--${tier}">${tierLabels[tier]}</span></td>
-                    <td>${channels.includes("email") ? "&#10003;" : "—"}</td>
-                    <td>${channels.includes("sms") ? "&#10003;" : "—"}</td>
-                    <td>${channels.includes("discord") ? "&#10003;" : "—"}</td>
-                    <td>${channels.includes("slack") ? "&#10003;" : "—"}</td>
-                    <td>${channels.includes("dashboard") ? "&#10003;" : "—"}</td>
-                `;
-                tierBody.appendChild(row);
+            for (const [id, value] of Object.entries(fieldMap)) {
+                const el = document.getElementById(id);
+                if (!el) continue;
+                if (el.type === "checkbox") {
+                    el.checked = !!value;
+                } else {
+                    el.value = value ?? "";
+                }
             }
 
-            // KB stats
-            const statsResp = await fetch("/api/stats");
-            const stats = await statsResp.json();
+            // Update badges
+            updateBadge("email-badge", settings.email_enabled);
+            updateBadge("sms-badge", settings.sms_enabled);
+            updateBadge("discord-badge", settings.discord_enabled);
+            updateBadge("slack-badge", settings.slack_enabled);
+        }
+
+        function updateBadge(id, enabled) {
+            const el = document.getElementById(id);
+            el.textContent = enabled ? "On" : "Off";
+            el.className = "status-badge " + (enabled ? "status--on" : "status--off");
+        }
+
+        function buildTierGrid() {
+            const container = document.getElementById("tier-checkboxes");
+            let html = "";
+            for (let tier = 1; tier <= 4; tier++) {
+                const active = settings.tier_map[tier] || [];
+                html += `<div class="tg-cell"><span class="tier-badge tier-badge--${tier}">${TIER_LABELS[tier]}</span></div>`;
+                for (const ch of CHANNELS) {
+                    const checked = active.includes(ch) ? "checked" : "";
+                    html += `<div class="tg-cell"><input type="checkbox" data-tier="${tier}" data-channel="${ch}" ${checked}></div>`;
+                }
+            }
+            container.innerHTML = html;
+        }
+
+        async function loadKBStats() {
+            const resp = await fetch("/api/stats");
+            const stats = await resp.json();
             if (stats.knowledge_base) {
                 const kb = stats.knowledge_base;
                 document.getElementById("kb-total").textContent = kb.total;
@@ -169,26 +544,112 @@
                 document.getElementById("kb-tier3").textContent = kb.tiers["3"] || 0;
                 document.getElementById("kb-tier4").textContent = kb.tiers["4"] || 0;
             }
+        }
 
-            // Test notifications
-            document.getElementById("btn-test-notifications").addEventListener("click", async () => {
-                const btn = document.getElementById("btn-test-notifications");
-                btn.disabled = true;
-                btn.textContent = "Sending...";
-                try {
-                    const resp = await fetch("/api/notifications/test", {method: "POST"});
-                    const results = await resp.json();
-                    const div = document.getElementById("test-results");
-                    div.classList.remove("hidden");
-                    div.innerHTML = Object.entries(results)
-                        .map(([ch, ok]) => `<div class="test-result ${ok ? 'test--ok' : 'test--fail'}">${ch}: ${ok ? 'Sent' : 'Failed'}</div>`)
-                        .join("");
-                } finally {
-                    btn.disabled = false;
-                    btn.textContent = "Test All Notifications";
+        // --- Save ---
+
+        window.saveSection = async function (section) {
+            const fields = SECTIONS[section];
+            if (!fields) return;
+
+            const data = {};
+            for (const key of fields) {
+                const el = document.getElementById("set-" + key);
+                if (!el) continue;
+                if (el.type === "checkbox") {
+                    data[key] = el.checked ? "true" : "false";
+                } else {
+                    data[key] = el.value;
                 }
-            });
-        });
+            }
+
+            try {
+                const resp = await fetch("/api/settings", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify(data),
+                });
+                if (resp.ok) {
+                    showMsg("msg-" + section, "Saved!");
+                    // Update badges
+                    if (data.email_enabled) updateBadge("email-badge", data.email_enabled === "true");
+                    if (data.sms_enabled) updateBadge("sms-badge", data.sms_enabled === "true");
+                    if (data.discord_enabled) updateBadge("discord-badge", data.discord_enabled === "true");
+                    if (data.slack_enabled) updateBadge("slack-badge", data.slack_enabled === "true");
+                } else {
+                    showMsg("msg-" + section, "Save failed", true);
+                }
+            } catch (e) {
+                showMsg("msg-" + section, "Network error", true);
+            }
+        };
+
+        window.saveTierMap = async function () {
+            const map = {};
+            for (let tier = 1; tier <= 4; tier++) {
+                map[tier] = [];
+                for (const ch of CHANNELS) {
+                    const cb = document.querySelector(`input[data-tier="${tier}"][data-channel="${ch}"]`);
+                    if (cb && cb.checked) map[tier].push(ch);
+                }
+            }
+
+            try {
+                const resp = await fetch("/api/settings", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({tier_notification_map: map}),
+                });
+                showMsg("msg-tiers", resp.ok ? "Saved!" : "Save failed", !resp.ok);
+            } catch (e) {
+                showMsg("msg-tiers", "Network error", true);
+            }
+        };
+
+        window.testChannel = async function (channel) {
+            const msgEl = document.getElementById("msg-" + channel);
+            showMsg("msg-" + channel, "Sending test...");
+            try {
+                const resp = await fetch("/api/notifications/test", {method: "POST"});
+                const results = await resp.json();
+                if (results[channel] === true) {
+                    showMsg("msg-" + channel, "Test sent!");
+                } else if (results[channel] === false) {
+                    showMsg("msg-" + channel, "Test failed — check logs", true);
+                } else {
+                    showMsg("msg-" + channel, "Channel not enabled", true);
+                }
+            } catch (e) {
+                showMsg("msg-" + channel, "Network error", true);
+            }
+        };
+
+        function showMsg(id, text, isError) {
+            const el = document.getElementById(id);
+            el.textContent = text;
+            el.style.color = isError ? "var(--tier1)" : "var(--tier4)";
+            el.classList.add("show");
+            setTimeout(() => el.classList.remove("show"), 3000);
+        }
+
+        // --- UI ---
+
+        window.toggleSection = function (id) {
+            document.getElementById(id).classList.toggle("open");
+        };
+
+        window.togglePw = function (id) {
+            const el = document.getElementById(id);
+            const btn = el.nextElementSibling;
+            if (el.type === "password") {
+                el.type = "text";
+                btn.textContent = "Hide";
+            } else {
+                el.type = "password";
+                btn.textContent = "Show";
+            }
+        };
+    })();
     </script>
 </body>
 </html>

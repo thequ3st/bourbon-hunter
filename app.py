@@ -38,6 +38,7 @@ last_scan_result = None
 def init_app():
     """Initialize database and sync knowledge base."""
     init_db()
+    Config.load_db_settings()
     count = sync_knowledge_base_to_db()
     logger.info(f"Synced {count} bourbons to database")
 
@@ -226,12 +227,30 @@ def api_test_notifications():
 @app.route("/api/settings", methods=["GET"])
 def api_get_settings():
     settings = {
+        # Email
         "email_enabled": Config.EMAIL_ENABLED,
+        "smtp_host": Config.SMTP_HOST,
+        "smtp_port": Config.SMTP_PORT,
+        "smtp_user": Config.SMTP_USER,
+        "smtp_password": "••••••••" if Config.SMTP_PASSWORD else "",
+        "email_to": Config.EMAIL_TO,
+        # SMS
         "sms_enabled": Config.SMS_ENABLED,
+        "twilio_account_sid": Config.TWILIO_ACCOUNT_SID,
+        "twilio_auth_token": "••••••••" if Config.TWILIO_AUTH_TOKEN else "",
+        "twilio_from_number": Config.TWILIO_FROM_NUMBER,
+        "sms_to_number": Config.SMS_TO_NUMBER,
+        # Discord
         "discord_enabled": Config.DISCORD_ENABLED,
+        "discord_webhook_url": Config.DISCORD_WEBHOOK_URL,
+        # Slack
         "slack_enabled": Config.SLACK_ENABLED,
+        "slack_webhook_url": Config.SLACK_WEBHOOK_URL,
+        # Scan
         "scan_interval": Config.SCAN_INTERVAL_MINUTES,
         "alert_cooldown": Config.ALERT_COOLDOWN_HOURS,
+        "request_delay": Config.REQUEST_DELAY_SECONDS,
+        # Tier map
         "tier_map": Config.TIER_NOTIFICATION_MAP,
     }
     return jsonify(settings)
@@ -243,8 +262,13 @@ def api_update_settings():
     if not data:
         return jsonify({"error": "No data provided"}), 400
 
+    # Mask-aware: skip password fields if they're still the masked value
     for key, value in data.items():
-        set_setting(key, json.dumps(value) if isinstance(value, (dict, list)) else str(value))
+        if isinstance(value, str) and value == "••••••••":
+            continue
+        db_val = json.dumps(value) if isinstance(value, (dict, list)) else str(value)
+        set_setting(key, db_val)
+        Config.apply_setting(key, db_val)
 
     return jsonify({"status": "updated"})
 
