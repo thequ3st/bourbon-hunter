@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="amber" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#d4a574"/>
+      <stop offset="100%" style="stop-color:#8b5e3c"/>
+    </linearGradient>
+  </defs>
+  <!-- Bottle silhouette -->
+  <rect x="45" y="10" width="30" height="12" rx="3" fill="url(#amber)" opacity="0.8"/>
+  <rect x="42" y="22" width="36" height="6" rx="2" fill="url(#amber)"/>
+  <path d="M42 28 Q42 34 38 40 L38 95 Q38 105 48 105 L72 105 Q82 105 82 95 L82 40 Q78 34 78 28 Z" fill="url(#amber)" opacity="0.9"/>
+  <!-- Label -->
+  <rect x="44" y="55" width="32" height="28" rx="2" fill="#1a1a2e" opacity="0.85"/>
+  <text x="60" y="67" text-anchor="middle" font-family="Georgia,serif" font-size="7" fill="#d4a574" font-weight="bold">BOURBON</text>
+  <text x="60" y="76" text-anchor="middle" font-family="Georgia,serif" font-size="5" fill="#9a9a9a">HUNTER</text>
+  <!-- Crosshair/target -->
+  <circle cx="60" cy="70" r="20" fill="none" stroke="#d4a574" stroke-width="1" opacity="0.3"/>
+  <line x1="60" y1="48" x2="60" y2="52" stroke="#d4a574" stroke-width="1" opacity="0.5"/>
+  <line x1="60" y1="88" x2="60" y2="92" stroke="#d4a574" stroke-width="1" opacity="0.5"/>
+  <line x1="38" y1="70" x2="42" y2="70" stroke="#d4a574" stroke-width="1" opacity="0.5"/>
+  <line x1="78" y1="70" x2="82" y2="70" stroke="#d4a574" stroke-width="1" opacity="0.5"/>
+</svg>

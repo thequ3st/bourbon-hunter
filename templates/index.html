@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PA Bourbon Hunter</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header__brand">
+            <h1 class="header__title">PA Bourbon Hunter</h1>
+            <p class="header__subtitle">FWGS Inventory Scanner</p>
+        </div>
+        <nav class="header__nav">
+            <button id="btn-scan-quick" class="btn btn--accent" title="Scan Tier 1-2 bourbons">Quick Scan</button>
+            <button id="btn-scan-full" class="btn btn--primary" title="Scan all tracked bourbons">Full Scan</button>
+            <a href="/settings" class="btn btn--ghost">Settings</a>
+        </nav>
+    </header>
+
+    <!-- Stats Bar -->
+    <section class="stats-bar" id="stats-bar">
+        <div class="stat-card">
+            <span class="stat-card__value" id="stat-tracked">—</span>
+            <span class="stat-card__label">Tracked</span>
+        </div>
+        <div class="stat-card stat-card--highlight">
+            <span class="stat-card__value" id="stat-in-stock">—</span>
+            <span class="stat-card__label">In Stock</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-card__value" id="stat-alerts">—</span>
+            <span class="stat-card__label">Alerts Today</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-card__value" id="stat-last-scan">—</span>
+            <span class="stat-card__label">Last Scan</span>
+        </div>
+    </section>
+
+    <!-- Scanner Status Banner -->
+    <div id="scan-banner" class="scan-banner hidden">
+        <div class="scan-banner__spinner"></div>
+        <span id="scan-banner-text">Scanning FWGS...</span>
+    </div>
+
+    <!-- Filters -->
+    <section class="filters">
+        <div class="filters__group">
+            <label>Tier:</label>
+            <button class="filter-btn active" data-tier="all">All</button>
+            <button class="filter-btn filter-btn--t1" data-tier="1">Unicorn</button>
+            <button class="filter-btn filter-btn--t2" data-tier="2">Highly Allocated</button>
+            <button class="filter-btn filter-btn--t3" data-tier="3">Allocated</button>
+            <button class="filter-btn filter-btn--t4" data-tier="4">Worth Tracking</button>
+        </div>
+        <div class="filters__group">
+            <label>Show:</label>
+            <button class="filter-btn active" data-show="all">All</button>
+            <button class="filter-btn" data-show="in-stock">In Stock Only</button>
+        </div>
+        <div class="filters__group">
+            <input type="text" id="search-input" class="search-input" placeholder="Search bourbons...">
+        </div>
+    </section>
+
+    <!-- Bourbon Grid -->
+    <main class="bourbon-grid" id="bourbon-grid">
+        <div class="loading">Loading bourbon database...</div>
+    </main>
+
+    <!-- Recent Finds Timeline -->
+    <section class="recent-finds" id="recent-finds-section">
+        <h2 class="section-title">Recent Finds</h2>
+        <div id="recent-finds" class="timeline">
+            <p class="empty-state">No recent finds. Start a scan to check FWGS inventory.</p>
+        </div>
+    </section>
+
+    <!-- Scan History -->
+    <section class="scan-history">
+        <h2 class="section-title">Scan History</h2>
+        <table class="scan-table" id="scan-table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Products</th>
+                    <th>New Finds</th>
+                </tr>
+            </thead>
+            <tbody id="scan-table-body">
+                <tr><td colspan="5" class="empty-state">No scans yet</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- Product Detail Modal -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal">
+            <button class="modal__close" id="modal-close">&times;</button>
+            <div id="modal-content"></div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>PA Bourbon Hunter v1.0 — Scans Fine Wine & Good Spirits inventory for allocated bourbon</p>
+    </footer>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings — PA Bourbon Hunter</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header__brand">
+            <h1 class="header__title">PA Bourbon Hunter</h1>
+            <p class="header__subtitle">Settings</p>
+        </div>
+        <nav class="header__nav">
+            <a href="/" class="btn btn--ghost">Back to Dashboard</a>
+        </nav>
+    </header>
+
+    <main class="settings-page">
+        <!-- Notification Channels -->
+        <section class="settings-section">
+            <h2 class="section-title">Notification Channels</h2>
+            <p class="settings-hint">Configure in your <code>.env</code> file, then restart the app.</p>
+
+            <div class="settings-grid" id="notification-status">
+                <div class="setting-card">
+                    <h3>Email (SMTP)</h3>
+                    <span class="status-badge" id="email-status">Loading...</span>
+                    <p class="setting-desc">Sends HTML email alerts via SMTP</p>
+                </div>
+                <div class="setting-card">
+                    <h3>SMS (Twilio)</h3>
+                    <span class="status-badge" id="sms-status">Loading...</span>
+                    <p class="setting-desc">Text message alerts via Twilio</p>
+                </div>
+                <div class="setting-card">
+                    <h3>Discord Webhook</h3>
+                    <span class="status-badge" id="discord-status">Loading...</span>
+                    <p class="setting-desc">Rich embed alerts to Discord channel</p>
+                </div>
+                <div class="setting-card">
+                    <h3>Slack Webhook</h3>
+                    <span class="status-badge" id="slack-status">Loading...</span>
+                    <p class="setting-desc">Block Kit alerts to Slack channel</p>
+                </div>
+            </div>
+
+            <button id="btn-test-notifications" class="btn btn--accent">
+                Test All Notifications
+            </button>
+            <div id="test-results" class="test-results hidden"></div>
+        </section>
+
+        <!-- Tier Notification Map -->
+        <section class="settings-section">
+            <h2 class="section-title">Tier Alert Routing</h2>
+            <p class="settings-hint">Which channels fire for each rarity tier</p>
+
+            <table class="tier-table">
+                <thead>
+                    <tr>
+                        <th>Tier</th>
+                        <th>Email</th>
+                        <th>SMS</th>
+                        <th>Discord</th>
+                        <th>Slack</th>
+                        <th>Dashboard</th>
+                    </tr>
+                </thead>
+                <tbody id="tier-map-body">
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Scan Settings -->
+        <section class="settings-section">
+            <h2 class="section-title">Scan Settings</h2>
+            <div class="settings-grid">
+                <div class="setting-card">
+                    <h3>Scan Interval</h3>
+                    <p class="setting-value" id="scan-interval">—</p>
+                    <p class="setting-desc">Minutes between automated scans</p>
+                </div>
+                <div class="setting-card">
+                    <h3>Alert Cooldown</h3>
+                    <p class="setting-value" id="alert-cooldown">—</p>
+                    <p class="setting-desc">Hours between repeat alerts for same product</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Knowledge Base Info -->
+        <section class="settings-section">
+            <h2 class="section-title">Knowledge Base</h2>
+            <div class="settings-grid" id="kb-stats">
+                <div class="setting-card">
+                    <h3>Total Bourbons</h3>
+                    <p class="setting-value" id="kb-total">—</p>
+                </div>
+                <div class="setting-card">
+                    <h3>Tier 1 (Unicorn)</h3>
+                    <p class="setting-value" id="kb-tier1">—</p>
+                </div>
+                <div class="setting-card">
+                    <h3>Tier 2 (Highly Allocated)</h3>
+                    <p class="setting-value" id="kb-tier2">—</p>
+                </div>
+                <div class="setting-card">
+                    <h3>Tier 3 (Allocated)</h3>
+                    <p class="setting-value" id="kb-tier3">—</p>
+                </div>
+                <div class="setting-card">
+                    <h3>Tier 4 (Worth Tracking)</h3>
+                    <p class="setting-value" id="kb-tier4">—</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>PA Bourbon Hunter v1.0</p>
+    </footer>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", async () => {
+            // Load settings
+            const resp = await fetch("/api/settings");
+            const settings = await resp.json();
+
+            // Channel status
+            const channels = ["email", "sms", "discord", "slack"];
+            channels.forEach(ch => {
+                const el = document.getElementById(`${ch}-status`);
+                const enabled = settings[`${ch}_enabled`];
+                el.textContent = enabled ? "Enabled" : "Disabled";
+                el.classList.add(enabled ? "status--on" : "status--off");
+            });
+
+            // Scan settings
+            document.getElementById("scan-interval").textContent = `${settings.scan_interval} min`;
+            document.getElementById("alert-cooldown").textContent = `${settings.alert_cooldown} hrs`;
+
+            // Tier map
+            const tierBody = document.getElementById("tier-map-body");
+            const tierLabels = {1: "Unicorn", 2: "Highly Allocated", 3: "Allocated", 4: "Worth Tracking"};
+            for (let tier = 1; tier <= 4; tier++) {
+                const channels = settings.tier_map[tier] || [];
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td><span class="tier-badge tier-badge--${tier}">${tierLabels[tier]}</span></td>
+                    <td>${channels.includes("email") ? "&#10003;" : "—"}</td>
+                    <td>${channels.includes("sms") ? "&#10003;" : "—"}</td>
+                    <td>${channels.includes("discord") ? "&#10003;" : "—"}</td>
+                    <td>${channels.includes("slack") ? "&#10003;" : "—"}</td>
+                    <td>${channels.includes("dashboard") ? "&#10003;" : "—"}</td>
+                `;
+                tierBody.appendChild(row);
+            }
+
+            // KB stats
+            const statsResp = await fetch("/api/stats");
+            const stats = await statsResp.json();
+            if (stats.knowledge_base) {
+                const kb = stats.knowledge_base;
+                document.getElementById("kb-total").textContent = kb.total;
+                document.getElementById("kb-tier1").textContent = kb.tiers["1"] || 0;
+                document.getElementById("kb-tier2").textContent = kb.tiers["2"] || 0;
+                document.getElementById("kb-tier3").textContent = kb.tiers["3"] || 0;
+                document.getElementById("kb-tier4").textContent = kb.tiers["4"] || 0;
+            }
+
+            // Test notifications
+            document.getElementById("btn-test-notifications").addEventListener("click", async () => {
+                const btn = document.getElementById("btn-test-notifications");
+                btn.disabled = true;
+                btn.textContent = "Sending...";
+                try {
+                    const resp = await fetch("/api/notifications/test", {method: "POST"});
+                    const results = await resp.json();
+                    const div = document.getElementById("test-results");
+                    div.classList.remove("hidden");
+                    div.innerHTML = Object.entries(results)
+                        .map(([ch, ok]) => `<div class="test-result ${ok ? 'test--ok' : 'test--fail'}">${ch}: ${ok ? 'Sent' : 'Failed'}</div>`)
+                        .join("");
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = "Test All Notifications";
+                }
+            });
+        });
+    </script>
+</body>
+</html>
