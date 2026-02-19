@@ -30,16 +30,19 @@ def upsert_bourbon(bourbon_data):
 def upsert_fwgs_product(product_data):
     with get_db() as conn:
         conn.execute("""
-            INSERT INTO fwgs_products (fwgs_code, name, price, size, proof, url, bourbon_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO fwgs_products (fwgs_code, name, price, size, proof, url, image_url, bourbon_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(fwgs_code) DO UPDATE SET
                 name=excluded.name, price=excluded.price, size=excluded.size,
-                proof=excluded.proof, url=excluded.url, bourbon_id=excluded.bourbon_id,
+                proof=excluded.proof, url=excluded.url,
+                image_url=COALESCE(excluded.image_url, fwgs_products.image_url),
+                bourbon_id=excluded.bourbon_id,
                 last_seen=CURRENT_TIMESTAMP
         """, (
             product_data.get("fwgs_code"), product_data["name"],
             product_data.get("price"), product_data.get("size"),
             product_data.get("proof"), product_data.get("url"),
+            product_data.get("image_url"),
             product_data.get("bourbon_id")
         ))
         row = conn.execute(
@@ -61,7 +64,8 @@ def add_inventory_snapshot(fwgs_product_id, store_number, store_name, store_addr
 def get_latest_inventory(bourbon_id=None):
     with get_db() as conn:
         query = """
-            SELECT fp.name, fp.fwgs_code, fp.price, fp.url, fp.bourbon_id,
+            SELECT fp.name, fp.fwgs_code, fp.price, fp.url, fp.image_url,
+                   fp.bourbon_id,
                    inv.store_number, inv.store_name, inv.store_address,
                    inv.quantity, inv.scanned_at,
                    b.rarity_tier, b.average_rating, b.distillery
@@ -137,6 +141,23 @@ def log_alert_sent(bourbon_id, fwgs_product_id, channel, message):
             INSERT INTO alerts_sent (bourbon_id, fwgs_product_id, channel, message)
             VALUES (?, ?, ?, ?)
         """, (bourbon_id, fwgs_product_id, channel, message))
+
+
+def get_bourbon_images():
+    """Get image URLs for bourbons from fwgs_products (one per bourbon)."""
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT bourbon_id, image_url FROM fwgs_products
+            WHERE bourbon_id IS NOT NULL AND image_url IS NOT NULL
+            AND image_url != ''
+            ORDER BY last_seen DESC
+        """).fetchall()
+        images = {}
+        for row in rows:
+            bid = row["bourbon_id"]
+            if bid not in images:
+                images[bid] = row["image_url"]
+        return images
 
 
 def get_scan_history(limit=20):

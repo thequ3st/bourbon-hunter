@@ -105,9 +105,12 @@ def _parse_occ_record(record):
         "category": attr("parentCategory.displayName"),
     }
 
-    # Build full URL
+    # Build full URLs
+    base = "https://www.finewineandgoodspirits.com"
     if product["route"]:
-        product["url"] = f"https://www.finewineandgoodspirits.com{product['route']}"
+        product["url"] = f"{base}{product['route']}"
+    if product["image_url"] and product["image_url"].startswith("/"):
+        product["image_url"] = f"{base}{product['image_url']}"
 
     return product
 

@@ -7,7 +7,7 @@ from config import Config
 from database.db import init_db
 from database.models import (
     get_all_bourbons, get_latest_inventory, get_scan_history,
-    get_dashboard_stats, get_setting, set_setting,
+    get_dashboard_stats, get_setting, set_setting, get_bourbon_images,
 )
 from knowledge.bourbon_db import (
     sync_knowledge_base_to_db, get_knowledge_base_stats,
@@ -70,9 +70,11 @@ def api_bourbons():
     bourbons = load_knowledge_base()["bourbons"]
     if tier:
         bourbons = [b for b in bourbons if b["rarity_tier"] == tier]
-    # Add tier labels
+    # Add tier labels and product images
+    images = get_bourbon_images()
     for b in bourbons:
         b["tier_label"] = get_tier_label(b["rarity_tier"])
+        b["image_url"] = images.get(b["id"])
     return jsonify(bourbons)
 
 

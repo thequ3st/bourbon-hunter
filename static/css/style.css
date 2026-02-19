@@ -263,6 +263,29 @@ body {
     box-shadow: var(--shadow);
 }
 
+.bourbon-card__body {
+    display: flex;
+    gap: 14px;
+}
+
+.bourbon-card__img {
+    flex-shrink: 0;
+    width: 60px;
+    align-self: flex-start;
+}
+
+.bourbon-card__img img {
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius-sm);
+    background: var(--bg-primary);
+}
+
+.bourbon-card__info {
+    flex: 1;
+    min-width: 0;
+}
+
 .bourbon-card--in-stock { border-left: 3px solid var(--tier4); }
 .bourbon-card--t1 { border-left: 3px solid var(--tier1); }
 .bourbon-card--t2 { border-left: 3px solid var(--tier2); }
@@ -468,6 +491,21 @@ body {
 }
 
 .modal__close:hover { color: var(--text-primary); }
+
+.modal__header-row {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    margin-bottom: 16px;
+}
+
+.modal__product-img {
+    width: 90px;
+    height: auto;
+    border-radius: var(--radius);
+    background: var(--bg-primary);
+    flex-shrink: 0;
+}
 
 .modal h2 {
     font-family: Georgia, serif;

@@ -55,6 +55,7 @@ def init_db(db_path=None):
                 size TEXT,
                 proof REAL,
                 url TEXT,
+                image_url TEXT,
                 bourbon_id TEXT REFERENCES bourbons(id),
                 first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -104,3 +105,9 @@ def init_db(db_path=None):
             CREATE INDEX IF NOT EXISTS idx_fwgs_bourbon ON fwgs_products(bourbon_id);
             CREATE INDEX IF NOT EXISTS idx_scan_log_time ON scan_log(started_at);
         """)
+
+        # Migrations for existing databases
+        cursor = conn.execute("PRAGMA table_info(fwgs_products)")
+        columns = {row[1] for row in cursor.fetchall()}
+        if "image_url" not in columns:
+            conn.execute("ALTER TABLE fwgs_products ADD COLUMN image_url TEXT")

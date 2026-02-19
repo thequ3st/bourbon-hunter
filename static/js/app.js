@@ -119,8 +119,13 @@
             const hasStock = stockInfo.length > 0;
             const cardClass = hasStock ? `bourbon-card--t${tier} bourbon-card--in-stock` : `bourbon-card--t${tier}`;
 
+            const imgUrl = b.image_url || getStockImage(b.id);
+
             return `
             <div class="bourbon-card ${cardClass}" data-bourbon-id="${b.id}">
+                <div class="bourbon-card__body">
+                    ${imgUrl ? `<div class="bourbon-card__img"><img src="${esc(imgUrl)}" alt="" loading="lazy"></div>` : ""}
+                    <div class="bourbon-card__info">
                 <div class="bourbon-card__header">
                     <span class="bourbon-card__name">${esc(b.name)}</span>
                     ${b.average_rating ? `<span class="rating">${b.average_rating}</span>` : ""}
@@ -139,6 +144,8 @@
                         ? nearbyStockLabel(stockInfo)
                         : '<span style="color: var(--text-muted)">Not found in FWGS</span>'
                     }
+                </div>
+                    </div>
                 </div>
             </div>`;
         }).join("");
@@ -411,10 +418,17 @@
         const stockInfo = getStockInfo(bourbonId);
         const tier = bourbon.rarity_tier;
 
+        const modalImg = bourbon.image_url || getStockImage(bourbonId);
+
         let html = `
-            <span class="tier-badge tier-badge--${tier}">${tierLabel(tier)}</span>
-            <h2 style="margin-top: 8px;">${esc(bourbon.name)}</h2>
-            <p style="color: var(--text-secondary); margin-bottom: 16px;">${esc(bourbon.distillery || "")}</p>
+            <div class="modal__header-row">
+                ${modalImg ? `<img class="modal__product-img" src="${esc(modalImg)}" alt="">` : ""}
+                <div>
+                    <span class="tier-badge tier-badge--${tier}">${tierLabel(tier)}</span>
+                    <h2 style="margin-top: 8px;">${esc(bourbon.name)}</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 16px;">${esc(bourbon.distillery || "")}</p>
+                </div>
+            </div>
 
             <div class="detail-row">
                 <span class="detail-row__label">Proof</span>
@@ -485,6 +499,11 @@
     }
 
     // ---- Helpers ----
+
+    function getStockImage(bourbonId) {
+        const inv = inventory.find(i => i.bourbon_id === bourbonId && i.image_url);
+        return inv ? inv.image_url : null;
+    }
 
     function nearbyStockLabel(stockInfo) {
         if (currentShowFilter === "nearby" && nearbyInventory !== null && stockInfo.length > 0) {
